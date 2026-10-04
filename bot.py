@@ -11,55 +11,57 @@ WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
 EXCEL_FILE = 'codThqq.xlsx'
 
 def check_and_activate(user_code, user_id):
-    if not os.path.exists(EXCEL_FILE): 
-        print(f"⚠️ تحذير: ملف الإكسل {EXCEL_FILE} غير موجود في المجلد!")
+    try:
+        if not os.path.exists(EXCEL_FILE): 
+            print("⚠️ ملف الإكسل غير موجود!")
+            return "error", None
+        
+        df = pd.read_excel(EXCEL_FILE)
+        
+        # تنظيف الأعمدة
+        df['code'] = df['code'].astype(str).str.strip()
+        user_code = str(user_code).strip()
+        
+        if user_code not in df['code'].values:
+            return "not_found", None
+        
+        idx = df.index[df['code'] == user_code].tolist()[0]
+        
+        current_status = str(df.at[idx, 'status']).strip() if pd.notna(df.at[idx, 'status']) else ""
+        saved_user_id = str(df.at[idx, 'user_id']).strip() if pd.notna(df.at[idx, 'user_id']) else ""
+        
+        if current_status == 'مستخدم':
+            if saved_user_id == str(user_id):
+                expiry_val = str(df.at[idx, 'expiry'])
+                return "success", expiry_val
+            return "used", None
+        
+        expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+        df.at[idx, 'status'] = 'مستخدم'
+        df.at[idx, 'expiry'] = expiry
+        df.at[idx, 'user_id'] = str(user_id)
+        df.to_excel(EXCEL_FILE, index=False)
+        return "success", expiry
+    except Exception as e:
+        print(f"❌ حدث خطأ برمجي أثناء التفعيل: {e}")
         return "error", None
-    
-    df = pd.read_excel(EXCEL_FILE)
-    
-    # تنظيف الأعمدة والكود المدخل من المسافات الزائدة
-    df['code'] = df['code'].astype(str).str.strip()
-    user_code = str(user_code).strip()
-    
-    if user_code not in df['code'].values:
-        return "not_found", None
-    
-    idx = df.index[df['code'] == user_code].tolist()[0]
-    
-    current_status = str(df.at[idx, 'status']).strip()
-    saved_user_id = str(df.at[idx, 'user_id']).strip()
-    
-    # التحقق مما إذا كان الكود مستخدماً لنفس المستخدم مسبقاً
-    if current_status == 'مستخدم':
-        if saved_user_id == str(user_id):
-            return "success", str(df.at[idx, 'expiry'])
-        return "used", None
-    
-    expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-    df.at[idx, 'status'] = 'مستخدم'
-    df.at[idx, 'expiry'] = expiry
-    df.at[idx, 'user_id'] = str(user_id)
-    df.to_excel(EXCEL_FILE, index=False)
-    return "success", expiry
 
 def check_user_active(user_id):
-    """التحقق مما إذا كان المستخدم لديه تفعيل ساري في ملف الإكسل"""
-    if not os.path.exists(EXCEL_FILE): return False
-    df = pd.read_excel(EXCEL_FILE)
-    
-    # تحويل العمود إلى نص لتجنب أخطاء المقارنة
-    df['user_id'] = df['user_id'].astype(str).str.strip()
-    user_rows = df[df['user_id'] == str(user_id)]
-    
-    if not user_rows.empty:
-        for _, row in user_rows.iterrows():
-            if str(row['status']).strip() == 'مستخدم':
-                try:
-                    expiry_date = datetime.strptime(str(row['expiry']).strip(), '%Y-%m-%d')
+    try:
+        if not os.path.exists(EXCEL_FILE): return False
+        df = pd.read_excel(EXCEL_FILE)
+        df['user_id'] = df['user_id'].astype(str).str.strip()
+        user_rows = df[df['user_id'] == str(user_id)]
+        
+        if not user_rows.empty:
+            for _, row in user_rows.iterrows():
+                if str(row['status']).strip() == 'مستخدم':
+                    expiry_str = str(row['expiry']).strip()
+                    expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
                     if datetime.now() <= expiry_date:
                         return True
-                except Exception:
-                    continue
+    except Exception as e:
+        print(f"❌ خطأ في التحقق من التفعيل: {e}")
     return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,7 +86,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if res == "success":
         personalized_url = f"{WEB_APP_URL}?user={u_id}"
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("إبدأ الفحص الآن 🔍", web_app=WebAppInfo(url=personalized_url))]])
-        await update.message.reply_text(f"✅ تم التفعيل بنجاح!\n📅 ينتهي في: {exp}", reply_markup=markup)
+        await update.message.reply_text(f"✅ تم التفعيل بنجاح!\n📅 ينتهي في: {exp or 'غير محدد'}", reply_markup=markup)
     elif res == "used":
         if check_user_active(u_id):
             personalized_url = f"{WEB_APP_URL}?user={u_id}"
@@ -93,7 +95,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ هذا الكود مستخدم مسبقاً من قِبل شخص آخر!")
     elif res == "error":
-        await update.message.reply_text("❌ حدث خطأ في النظام (ملف الأكواد غير موجود بالسيرفر).")
+        await update.message.reply_text("❌ حدث خطأ تقني في معالجة الكود. يجدر مراجعة السجلات.")
     else:
         await update.message.reply_text("❌ كود خاطئ! احصل عليه من المتجر.", 
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("المتجر 🛒", url=STORE_URL)]]))
