@@ -16,23 +16,24 @@ def check_and_activate(user_code, user_id):
             print("⚠️ ملف الإكسل غير موجود في مجلد المشروع!")
             return "error", None
         
-        # قراءة الأعمدة كـ نصوص لتجنب أخطاء تحويل البيانات والتاريخ
+        # قراءة الأعمدة كنصوص صريحة
         df = pd.read_excel(EXCEL_FILE, dtype=str)
         
         # تنظيف الفراغات
-        df['code'] = df['code'].str.strip()
-        df['status'] = df['status'].str.fillna('').str.strip()
-        df['user_id'] = df['user_id'].str.fillna('').str.strip()
-        df['expiry'] = df['expiry'].str.fillna('').str.strip()
+        df['code'] = df['code'].fillna('').str.strip()
+        df['status'] = df['status'].fillna('').str.strip()
+        df['user_id'] = df['user_id'].fillna('').str.strip()
+        df['expiry'] = df['expiry'].fillna('').str.strip()
         
         user_code = str(user_code).strip()
         user_id = str(user_id).strip()
         
-        if user_code not in df['code'].values:
+        # البحث عن الكود باستخدام البحث السريع في المصفوفة
+        match = df[df['code'] == user_code]
+        if match.empty:
             return "not_found", None
         
-        idx = df.index[df['code'] == user_code].tolist()[0]
-        
+        idx = match.index[0]
         current_status = df.at[idx, 'status']
         saved_user_id = df.at[idx, 'user_id']
         
@@ -44,11 +45,11 @@ def check_and_activate(user_code, user_id):
         
         # تفعيل الكود لأول مرة
         expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-        df.at[idx, 'status'] = 'مستخدم'
-        df.at[idx, 'expiry'] = expiry
-        df.at[idx, 'user_id'] = user_id
+        df.loc[idx, 'status'] = 'مستخدم'
+        df.loc[idx, 'expiry'] = expiry
+        df.loc[idx, 'user_id'] = user_id
         
-        # حفظ التعديلات في الإكسل
+        # حفظ التعديلات مع الحفاظ على صيغة الملف الأضخم
         df.to_excel(EXCEL_FILE, index=False)
         return "success", expiry
     except Exception as e:
@@ -59,8 +60,9 @@ def check_user_active(user_id):
     try:
         if not os.path.exists(EXCEL_FILE): return False
         df = pd.read_excel(EXCEL_FILE, dtype=str)
-        df['user_id'] = df['user_id'].str.fillna('').str.strip()
-        df['status'] = df['status'].str.fillna('').str.strip()
+        df['user_id'] = df['user_id'].fillna('').str.strip()
+        df['status'] = df['status'].fillna('').str.strip()
+        df['expiry'] = df['expiry'].fillna('').str.strip()
         
         user_id = str(user_id).strip()
         user_rows = df[df['user_id'] == user_id]
