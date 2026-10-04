@@ -16,13 +16,14 @@ def check_and_activate(user_code, user_id):
             print("⚠️ ملف الإكسل غير موجود في مجلد المشروع!")
             return "error", None
         
-        # قراءة ملف الإكسل
-        df = pd.read_excel(EXCEL_FILE)
+        # قراءة الأعمدة كـ نصوص لتجنب أخطاء تحويل البيانات والتاريخ
+        df = pd.read_excel(EXCEL_FILE, dtype=str)
         
-        # التأكد من تحويل الأعمدة إلى نصوص لتجنب أخطاء المطابقة
-        df['code'] = df['code'].astype(str).str.strip()
-        df['status'] = df['status'].astype(str).str.strip()
-        df['user_id'] = df['user_id'].astype(str).str.strip()
+        # تنظيف الفراغات
+        df['code'] = df['code'].str.strip()
+        df['status'] = df['status'].str.fillna('').str.strip()
+        df['user_id'] = df['user_id'].str.fillna('').str.strip()
+        df['expiry'] = df['expiry'].str.fillna('').str.strip()
         
         user_code = str(user_code).strip()
         user_id = str(user_id).strip()
@@ -35,14 +36,11 @@ def check_and_activate(user_code, user_id):
         current_status = df.at[idx, 'status']
         saved_user_id = df.at[idx, 'user_id']
         
-        # إذا كان الكود مستخدماً من قبل
-        if current_status == 'مستخدم' or current_status == 'nan':
+        # إذا كان الكود مستخدماً مسبقاً
+        if current_status == 'مستخدم':
             if saved_user_id == user_id:
-                expiry_val = str(df.at[idx, 'expiry'])
-                return "success", expiry_val
-            # إذا كان مستخدماً لشخص آخر
-            if saved_user_id and saved_user_id != 'nan' and saved_user_id != 'None':
-                return "used", None
+                return "success", df.at[idx, 'expiry']
+            return "used", None
         
         # تفعيل الكود لأول مرة
         expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
@@ -50,7 +48,7 @@ def check_and_activate(user_code, user_id):
         df.at[idx, 'expiry'] = expiry
         df.at[idx, 'user_id'] = user_id
         
-        # حفظ التعديلات في ملف الإكسل
+        # حفظ التعديلات في الإكسل
         df.to_excel(EXCEL_FILE, index=False)
         return "success", expiry
     except Exception as e:
@@ -60,20 +58,22 @@ def check_and_activate(user_code, user_id):
 def check_user_active(user_id):
     try:
         if not os.path.exists(EXCEL_FILE): return False
-        df = pd.read_excel(EXCEL_FILE)
-        df['user_id'] = df['user_id'].astype(str).str.strip()
-        df['status'] = df['status'].astype(str).str.strip()
+        df = pd.read_excel(EXCEL_FILE, dtype=str)
+        df['user_id'] = df['user_id'].str.fillna('').str.strip()
+        df['status'] = df['status'].str.fillna('').str.strip()
         
         user_id = str(user_id).strip()
         user_rows = df[df['user_id'] == user_id]
         
         if not user_rows.empty:
             for _, row in user_rows.iterrows():
-                if row['status'] == 'مستخدم':
-                    expiry_str = str(row['expiry']).strip()
-                    expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
-                    if datetime.now() <= expiry_date:
-                        return True
+                if row['status'] == 'مستخدم' and row['expiry']:
+                    try:
+                        expiry_date = datetime.strptime(row['expiry'], '%Y-%m-%d')
+                        if datetime.now() <= expiry_date:
+                            return True
+                    except Exception:
+                        continue
     except Exception as e:
         print(f"❌ خطأ في التحقق من نشاط المستخدم: {e}")
     return False
@@ -107,7 +107,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ حدث خطأ تقني في قراءة ملف الأكواد.")
     else:
         await update.message.reply_text("❌ كود خاطئ! احصل عليه من المتجر.", 
-                                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("المتجر 🛒", url=STORE_URL)]]))
+                                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("المتجر 🛒", url=STORE_URL)]]) )
 
 def main():
     app = Application.builder().token(TOKEN).build()
