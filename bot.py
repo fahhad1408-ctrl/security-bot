@@ -1,4 +1,5 @@
-import openpyxl
+import sqlite3
+import pandas as pd
 from datetime import datetime, timedelta
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -8,85 +9,104 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = '8755097566:AAH3VXDwvajPc_FtfiRKvmz9NhyqQ7eQX6A'
 STORE_URL = 'https://salla.sa/yourstore' 
 WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
+DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
+
+# دالة التحويل التلقائي من إكسل إلى SQLite فور تشغيل البوت على السيرفر
+def init_database():
+    if not os.path.exists(DB_FILE):
+        print("🔄 جاري إنشاء قاعدة البيانات وتحويل الأكواد من ملف الإكسل لأول مرة...")
+        if os.path.exists(EXCEL_FILE):
+            df = pd.read_excel(EXCEL_FILE, dtype=str)
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT UNIQUE,
+                status TEXT,
+                expiry TEXT,
+                user_id TEXT
+            )
+            ''')
+            
+            for _, row in df.iterrows():
+                code = str(row['code']).strip() if pd.notna(row['code']) else ""
+                status = str(row['status']).strip() if pd.notna(row['status']) else "جديد"
+                expiry = str(row['expiry']).strip() if pd.notna(row['expiry']) else ""
+                user_id = str(row['user_id']).strip() if pd.notna(row['user_id']) else ""
+                
+                if code:
+                    cursor.execute('''
+                    INSERT OR IGNORE INTO codes (code, status, expiry, user_id) 
+                    VALUES (?, ?, ?, ?)
+                    ''', (code, status, expiry, user_id))
+            
+            conn.commit()
+            conn.close()
+            print("✅ تم إنشاء وتعبئة قاعدة البيانات SQLite بنجاح تام!")
+        else:
+            print("⚠️ تنبيه: لم يتم العثور على ملف الإكسل!")
 
 def check_and_activate(user_code, user_id):
     try:
-        if not os.path.exists(EXCEL_FILE): 
-            return "error", None
-        
-        # استخدام مكتبة openpyxl مباشرة لقراءة وتعديل الملف وحفظه فوراً
-        wb = openpyxl.load_workbook(EXCEL_FILE)
-        sheet = wb.active
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
         
         user_code = str(user_code).strip()
         user_id = str(user_id).strip()
         
-        row_index = None
-        current_status = None
-        saved_user_id = None
-        expiry_val = None
+        cursor.execute("SELECT status, expiry, user_id FROM codes WHERE code = ?", (user_code,))
+        row = cursor.fetchone()
         
-        # البحث عن الكود صفاً بصَف (سريع جداً ومباشر)
-        for row in range(2, sheet.max_row + 1):
-            code_cell = sheet.cell(row=row, column=1) # العمود الأول: code
-            if code_cell.value and str(code_cell.value).strip() == user_code:
-                row_index = row
-                current_status = str(sheet.cell(row=row, column=2).value).strip() # status
-                expiry_val = str(sheet.cell(row=row, column=3).value).strip()     # expiry
-                saved_user_id = str(sheet.cell(row=row, column=4).value).strip()  # user_id
-                break
-                
-        if not row_index:
-            wb.close()
+        if not row:
+            conn.close()
             return "not_found", None
             
-        # إذا كان مستخدماً مسبقاً
+        current_status, expiry_val, saved_user_id = row
+        
         if current_status == 'مستخدم':
             if saved_user_id == user_id:
-                wb.close()
+                conn.close()
                 return "success", expiry_val
-            wb.close()
+            conn.close()
             return "used", None
             
-        # تفعيل الكود لأول مرة وتحديث الخلايا مباشرة
         expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-        sheet.cell(row=row_index, column=2, value='مستخدم')
-        sheet.cell(row=row_index, column=3, value=expiry)
-        sheet.cell(row=row_index, column=4, value=user_id)
+        cursor.execute("""
+            UPDATE codes 
+            SET status = 'مستخدم', expiry = ?, user_id = ? 
+            WHERE code = ?
+        """, (expiry, user_id, user_code))
         
-        # حفظ التعديل مباشرة في الملف
-        wb.save(EXCEL_FILE)
-        wb.close()
+        conn.commit()
+        conn.close()
         return "success", expiry
         
     except Exception as e:
-        print(f"❌ خطأ أثناء التحديث المباشر للإكسل: {e}")
+        print(f"❌ خطأ في قاعدة البيانات: {e}")
         return "error", None
 
 def check_user_active(user_id):
     try:
-        if not os.path.exists(EXCEL_FILE): return False
-        wb = openpyxl.load_workbook(EXCEL_FILE, read_only=True)
-        sheet = wb.active
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
         user_id = str(user_id).strip()
         
-        is_active = False
-        for row in sheet.iter_rows(min_row=2, values_only=True):
-            status = str(row[1]).strip()
-            expiry_str = str(row[2]).strip()
-            row_user_id = str(row[3]).strip()
-            
-            if row_user_id == user_id and status == 'مستخدم':
-                try:
-                    expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
-                    if datetime.now() <= expiry_date:
-                        is_active = True
-                        break
-                except:
-                    continue
-        wb.close()
-        return is_active
+        cursor.execute("SELECT expiry FROM codes WHERE user_id = ? AND status = 'مستخدم'", (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        for row in rows:
+            expiry_str = row[0]
+            try:
+                expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
+                if datetime.now() <= expiry_date:
+                    return True
+            except:
+                continue
+        return False
     except Exception as e:
         print(f"❌ خطأ في التحقق: {e}")
         return False
@@ -117,16 +137,19 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif res == "used":
         await update.message.reply_text("❌ هذا الكود مستخدم مسبقاً من قِبل شخص آخر!")
     elif res == "error":
-        await update.message.reply_text("❌ حدث خطأ تقني في قراءة ملف الأكواد.")
+        await update.message.reply_text("❌ حدث خطأ تقني في قاعدة البيانات.")
     else:
         await update.message.reply_text("❌ كود خاطئ! احصل عليه من المتجر.", 
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("المتجر 🛒", url=STORE_URL)]]) )
 
 def main():
+    # تشغيل فحص وإنشاء قاعدة البيانات تلقائياً أول ما يشتغل البوت
+    init_database()
+    
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
-    print("🚀 البوت يعمل الآن...")
+    print("🚀 البوت يعمل الآن بقاعدة بيانات SQLite الذكية...")
     app.run_polling()
 
 if __name__ == '__main__':
