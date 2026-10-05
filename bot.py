@@ -12,9 +12,6 @@ WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
 DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
 
-# الآيدي الخاص بك (المسؤول الوحيد)
-ADMIN_ID = 966043525
-
 def init_database():
     if not os.path.exists(DB_FILE):
         print("🔄 جاري إنشاء قاعدة البيانات وتحويل الأكواد من ملف الإكسل لأول مرة...")
@@ -111,7 +108,6 @@ def check_user_active(user_id):
         print(f"❌ خطأ في التحقق: {e}")
         return False
 
-# دالة البدء النظيفة الخالية من أي قنوات أو شروط
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if check_user_active(user_id):
@@ -130,73 +126,75 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_input = update.message.text.strip()
     u_id = update.message.from_user.id
     
-    # أوامر المسؤول المحمية
-    if u_id == ADMIN_ID:
-        if text_input == "Ather":
-            if os.path.exists(DB_FILE):
-                with open(DB_FILE, 'rb') as f:
-                    await update.message.reply_document(document=f, caption="📊 قاعدة البيانات الحالية.")
-            else:
-                await update.message.reply_text("❌ قاعدة البيانات غير موجودة بعد.")
-            return
+    # 1. أمر تحميل قاعدة البيانات (Ather)
+    if text_input == "Ather":
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, 'rb') as f:
+                await update.message.reply_document(document=f, caption="📊 قاعدة البيانات الحالية.")
+        else:
+            await update.message.reply_text("❌ قاعدة البيانات غير موجودة بعد.")
+        return
 
-        if text_input == "foz":
+    # 2. أمر عرض الإحصائيات (foz)
+    if text_input == "foz":
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM codes WHERE status = 'مستخدم'")
+            count = cursor.fetchone()[0]
+            conn.close()
+            await update.message.reply_text(f"👥 عدد الأشخاص الذين استخدموا البوت وفعلوا الأكواد هو: {count} مستخدم.")
+        except Exception as e:
+            await update.message.reply_text("❌ حدث خطأ أثناء جلب الإحصائية.")
+        return
+
+    # 3. أمر إضافة أكواد متعددة (addfahhad)
+    if text_input.startswith("addfahhad"):
+        content = text_input.replace("addfahhad", "").strip()
+        if content:
+            codes_list = content.split()
             try:
                 conn = sqlite3.connect(DB_FILE)
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM codes WHERE status = 'مستخدم'")
-                count = cursor.fetchone()[0]
+                added_count = 0
+                for c in codes_list:
+                    c = c.strip()
+                    if c:
+                        cursor.execute("INSERT OR IGNORE INTO codes (code, status, expiry, user_id) VALUES (?, 'جديد', '', '')", (c,))
+                        if cursor.rowcount > 0:
+                            added_count += 1
+                conn.commit()
                 conn.close()
-                await update.message.reply_text(f"👥 عدد الأشخاص الذين استخدموا البوت وفعلوا الأكواد هو: {count} مستخدم.")
+                await update.message.reply_text(f"✅ تم بنجاح إضافة {added_count} كوداً جديداً للقاعدة!")
             except Exception as e:
-                await update.message.reply_text("❌ حدث خطأ أثناء جلب الإحصائية.")
-            return
+                await update.message.reply_text(f"❌ حدث خطأ أثناء الإضافة: {e}")
+        else:
+            await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد بعد `addfahhad`", parse_mode="Markdown")
+        return
 
-        if text_input.startswith("addfahhad"):
-            content = text_input.replace("addfahhad", "").strip()
-            if content:
-                codes_list = content.split()
-                try:
-                    conn = sqlite3.connect(DB_FILE)
-                    cursor = conn.cursor()
-                    added_count = 0
-                    for c in codes_list:
-                        c = c.strip()
-                        if c:
-                            cursor.execute("INSERT OR IGNORE INTO codes (code, status, expiry, user_id) VALUES (?, 'جديد', '', '')", (c,))
-                            if cursor.rowcount > 0:
-                                added_count += 1
-                    conn.commit()
-                    conn.close()
-                    await update.message.reply_text(f"✅ تم بنجاح إضافة {added_count} كوداً جديداً للقاعدة!")
-                except Exception as e:
-                    await update.message.reply_text(f"❌ حدث خطأ أثناء الإضافة: {e}")
-            else:
-                await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد بعد `addfahhad`", parse_mode="Markdown")
-            return
-
-        if text_input.startswith("delfahhad"):
-            content = text_input.replace("delfahhad", "").strip()
-            if content:
-                codes_list = content.split()
-                try:
-                    conn = sqlite3.connect(DB_FILE)
-                    cursor = conn.cursor()
-                    deleted_count = 0
-                    for c in codes_list:
-                        c = c.strip()
-                        if c:
-                            cursor.execute("DELETE FROM codes WHERE code = ?", (c,))
-                            if cursor.rowcount > 0:
-                                deleted_count += 1
-                    conn.commit()
-                    conn.close()
-                    await update.message.reply_text(f"🗑️ تم بنجاح حذف {deleted_count} كوداً من القاعدة!")
-                except Exception as e:
-                    await update.message.reply_text(f"❌ حدث خطأ أثناء الحذف: {e}")
-            else:
-                await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد المراد حذفها بعد `delfahhad`", parse_mode="Markdown")
-            return
+    # 4. أمر حذف أكواد متعددة (delfahhad)
+    if text_input.startswith("delfahhad"):
+        content = text_input.replace("delfahhad", "").strip()
+        if content:
+            codes_list = content.split()
+            try:
+                conn = sqlite3.connect(DB_FILE)
+                cursor = conn.cursor()
+                deleted_count = 0
+                for c in codes_list:
+                    c = c.strip()
+                    if c:
+                        cursor.execute("DELETE FROM codes WHERE code = ?", (c,))
+                        if cursor.rowcount > 0:
+                            deleted_count += 1
+                conn.commit()
+                conn.close()
+                await update.message.reply_text(f"🗑️️ تم بنجاح حذف {deleted_count} كوداً من القاعدة!")
+            except Exception as e:
+                await update.message.reply_text(f"❌ حدث خطأ أثناء الحذف: {e}")
+        else:
+            await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد المراد حذفها بعد `delfahhad`", parse_mode="Markdown")
+        return
 
     # التفعيل العادي للمستخدمين
     res, exp = check_and_activate(text_input, u_id)
@@ -219,7 +217,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
-    print("🚀 البوت يعمل الآن بكامل طاقته بدون اشتراك إجباري...")
+    print("🚀 البوت يعمل الآن بدون قيود الآيدي وبدون اشتراك...")
     app.run_polling()
 
 if __name__ == '__main__':
