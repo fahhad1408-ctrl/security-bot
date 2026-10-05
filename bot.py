@@ -129,7 +129,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_input = update.message.text.strip()
     u_id = update.message.from_user.id
     
-    # التحقق مما إذا كانت المرسل هو المسؤول (Admin) لتنفيذ الأوامر الخاصة
+    # التحقق مما إذا كان المرسل هو المسؤول (Admin) لتنفيذ الأوامر الخاصة
     if u_id == ADMIN_ID:
         # 1. أمر تحميل قاعدة البيانات (Ather)
         if text_input == "Ather":
@@ -201,7 +201,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد المراد حذفها بعد `delfahhad`", parse_mode="Markdown")
             return
 
-    # المعالجة العادية لتفعيل الكود من قِبل المستخدمين العاديين (وكذلك لو حاول شخص غريب كتابة الكلمات السرية)
+    # المعالجة العادية لتفعيل الكود من قِبل المستخدمين العاديين
     res, exp = check_and_activate(text_input, u_id)
     
     if res == "success":
@@ -222,7 +222,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
-    print("🚀 البوت يعمل الآن بحماية كاملة للمسؤول...")
+    print("🚀 البوت يعمل الآن بدون أي قيود اشتراك...")
     app.run_polling()
 
 if __name__ == '__main__':
