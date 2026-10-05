@@ -1,4 +1,4 @@
-import pandas as pd
+import openpyxl
 from datetime import datetime, timedelta
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -13,72 +13,83 @@ EXCEL_FILE = 'codThqq.xlsx'
 def check_and_activate(user_code, user_id):
     try:
         if not os.path.exists(EXCEL_FILE): 
-            print("⚠️ ملف الإكسل غير موجود في مجلد المشروع!")
             return "error", None
         
-        # قراءة الأعمدة كنصوص صريحة
-        df = pd.read_excel(EXCEL_FILE, dtype=str)
-        
-        # تنظيف الفراغات
-        df['code'] = df['code'].fillna('').str.strip()
-        df['status'] = df['status'].fillna('').str.strip()
-        df['user_id'] = df['user_id'].fillna('').str.strip()
-        df['expiry'] = df['expiry'].fillna('').str.strip()
+        # استخدام مكتبة openpyxl مباشرة لقراءة وتعديل الملف وحفظه فوراً
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        sheet = wb.active
         
         user_code = str(user_code).strip()
         user_id = str(user_id).strip()
         
-        # البحث عن الكود باستخدام البحث السريع في المصفوفة
-        match = df[df['code'] == user_code]
-        if match.empty:
+        row_index = None
+        current_status = None
+        saved_user_id = None
+        expiry_val = None
+        
+        # البحث عن الكود صفاً بصَف (سريع جداً ومباشر)
+        for row in range(2, sheet.max_row + 1):
+            code_cell = sheet.cell(row=row, column=1) # العمود الأول: code
+            if code_cell.value and str(code_cell.value).strip() == user_code:
+                row_index = row
+                current_status = str(sheet.cell(row=row, column=2).value).strip() # status
+                expiry_val = str(sheet.cell(row=row, column=3).value).strip()     # expiry
+                saved_user_id = str(sheet.cell(row=row, column=4).value).strip()  # user_id
+                break
+                
+        if not row_index:
+            wb.close()
             return "not_found", None
-        
-        idx = match.index[0]
-        current_status = df.at[idx, 'status']
-        saved_user_id = df.at[idx, 'user_id']
-        
-        # إذا كان الكود مستخدماً مسبقاً
+            
+        # إذا كان مستخدماً مسبقاً
         if current_status == 'مستخدم':
             if saved_user_id == user_id:
-                return "success", df.at[idx, 'expiry']
+                wb.close()
+                return "success", expiry_val
+            wb.close()
             return "used", None
-        
-        # تفعيل الكود لأول مرة
+            
+        # تفعيل الكود لأول مرة وتحديث الخلايا مباشرة
         expiry = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-        df.loc[idx, 'status'] = 'مستخدم'
-        df.loc[idx, 'expiry'] = expiry
-        df.loc[idx, 'user_id'] = user_id
+        sheet.cell(row=row_index, column=2, value='مستخدم')
+        sheet.cell(row=row_index, column=3, value=expiry)
+        sheet.cell(row=row_index, column=4, value=user_id)
         
-        # حفظ التعديلات مع الحفاظ على صيغة الملف الأضخم
-        df.to_excel(EXCEL_FILE, index=False)
+        # حفظ التعديل مباشرة في الملف
+        wb.save(EXCEL_FILE)
+        wb.close()
         return "success", expiry
+        
     except Exception as e:
-        print(f"❌ خطأ أثناء قراءة أو تحديث الإكسل: {e}")
+        print(f"❌ خطأ أثناء التحديث المباشر للإكسل: {e}")
         return "error", None
 
 def check_user_active(user_id):
     try:
         if not os.path.exists(EXCEL_FILE): return False
-        df = pd.read_excel(EXCEL_FILE, dtype=str)
-        df['user_id'] = df['user_id'].fillna('').str.strip()
-        df['status'] = df['status'].fillna('').str.strip()
-        df['expiry'] = df['expiry'].fillna('').str.strip()
-        
+        wb = openpyxl.load_workbook(EXCEL_FILE, read_only=True)
+        sheet = wb.active
         user_id = str(user_id).strip()
-        user_rows = df[df['user_id'] == user_id]
         
-        if not user_rows.empty:
-            for _, row in user_rows.iterrows():
-                if row['status'] == 'مستخدم' and row['expiry']:
-                    try:
-                        expiry_date = datetime.strptime(row['expiry'], '%Y-%m-%d')
-                        if datetime.now() <= expiry_date:
-                            return True
-                    except Exception:
-                        continue
+        is_active = False
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            status = str(row[1]).strip()
+            expiry_str = str(row[2]).strip()
+            row_user_id = str(row[3]).strip()
+            
+            if row_user_id == user_id and status == 'مستخدم':
+                try:
+                    expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
+                    if datetime.now() <= expiry_date:
+                        is_active = True
+                        break
+                except:
+                    continue
+        wb.close()
+        return is_active
     except Exception as e:
-        print(f"❌ خطأ في التحقق من نشاط المستخدم: {e}")
-    return False
+        print(f"❌ خطأ في التحقق: {e}")
+        return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
