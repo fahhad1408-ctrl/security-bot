@@ -12,7 +12,6 @@ WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
 DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
 
-# دالة التحويل التلقائي من إكسل إلى SQLite فور تشغيل البوت على السيرفر
 def init_database():
     if not os.path.exists(DB_FILE):
         print("🔄 جاري إنشاء قاعدة البيانات وتحويل الأكواد من ملف الإكسل لأول مرة...")
@@ -46,8 +45,6 @@ def init_database():
             conn.commit()
             conn.close()
             print("✅ تم إنشاء وتعبئة قاعدة البيانات SQLite بنجاح تام!")
-        else:
-            print("⚠️ تنبيه: لم يتم العثور على ملف الإكسل!")
 
 def check_and_activate(user_code, user_id):
     try:
@@ -125,10 +122,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-    u_code = update.message.text.strip()
+        
+    text_input = update.message.text.strip()
     u_id = update.message.from_user.id
     
-    res, exp = check_and_activate(u_code, u_id)
+    # إذا كانت الكلمة السرية Ather ترسل ملف القاعدة
+    if text_input == "Ather":
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, 'rb') as f:
+                await update.message.reply_document(document=f, caption="📊 قاعدة البيانات الحالية.")
+        else:
+            await update.message.reply_text("❌ قاعدة البيانات غير موجودة بعد.")
+        return
+
+    # إذا كانت الكلمة السرية foz تعطي عدد المستخدمين
+    if text_input == "foz":
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM codes WHERE status = 'مستخدم'")
+            count = cursor.fetchone()[0]
+            conn.close()
+            await update.message.reply_text(f"👥 عدد الأشخاص الذين استخدموا البوت وفعلوا الأكواد هو: {count} مستخدم.")
+        except Exception as e:
+            await update.message.reply_text("❌ حدث خطأ أثناء جلب الإحصائية.")
+        return
+
+    # المعالجة الطبيعية للأكواد العادية
+    res, exp = check_and_activate(text_input, u_id)
     
     if res == "success":
         personalized_url = f"{WEB_APP_URL}?user={u_id}"
@@ -143,13 +164,12 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("المتجر 🛒", url=STORE_URL)]]) )
 
 def main():
-    # تشغيل فحص وإنشاء قاعدة البيانات تلقائياً أول ما يشتغل البوت
     init_database()
     
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
-    print("🚀 البوت يعمل الآن بقاعدة بيانات SQLite الذكية...")
+    print("🚀 البوت يعمل الآن...")
     app.run_polling()
 
 if __name__ == '__main__':
