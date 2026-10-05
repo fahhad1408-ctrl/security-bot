@@ -111,6 +111,7 @@ def check_user_active(user_id):
         print(f"❌ خطأ في التحقق: {e}")
         return False
 
+# دالة البدء النظيفة الخالية من أي قنوات أو شروط
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if check_user_active(user_id):
@@ -129,9 +130,8 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_input = update.message.text.strip()
     u_id = update.message.from_user.id
     
-    # التحقق مما إذا كان المرسل هو المسؤول (Admin) لتنفيذ الأوامر الخاصة
+    # أوامر المسؤول المحمية
     if u_id == ADMIN_ID:
-        # 1. أمر تحميل قاعدة البيانات (Ather)
         if text_input == "Ather":
             if os.path.exists(DB_FILE):
                 with open(DB_FILE, 'rb') as f:
@@ -140,7 +140,6 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ قاعدة البيانات غير موجودة بعد.")
             return
 
-        # 2. أمر عرض الإحصائيات (foz)
         if text_input == "foz":
             try:
                 conn = sqlite3.connect(DB_FILE)
@@ -153,7 +152,6 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ حدث خطأ أثناء جلب الإحصائية.")
             return
 
-        # 3. أمر إضافة أكواد متعددة (addfahhad)
         if text_input.startswith("addfahhad"):
             content = text_input.replace("addfahhad", "").strip()
             if content:
@@ -177,7 +175,6 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد بعد `addfahhad`", parse_mode="Markdown")
             return
 
-        # 4. أمر حذف أكواد متعددة (delfahhad)
         if text_input.startswith("delfahhad"):
             content = text_input.replace("delfahhad", "").strip()
             if content:
@@ -201,7 +198,7 @@ async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⚠️ الرجاء كتابة أو لصق الأكواد المراد حذفها بعد `delfahhad`", parse_mode="Markdown")
             return
 
-    # المعالجة العادية لتفعيل الكود من قِبل المستخدمين العاديين
+    # التفعيل العادي للمستخدمين
     res, exp = check_and_activate(text_input, u_id)
     
     if res == "success":
@@ -222,7 +219,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
-    print("🚀 البوت يعمل الآن بدون أي قيود اشتراك...")
+    print("🚀 البوت يعمل الآن بكامل طاقته بدون اشتراك إجباري...")
     app.run_polling()
 
 if __name__ == '__main__':
