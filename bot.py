@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- الإعدادات ---
-TOKEN = '8870760665:AAG3IMnQi_9wzi1_rNKT1n39qxnlzQtkRm4'
+TOKEN = '8870760665:AAGYJUTA0-MW34ivVBeNbYGUeBj1PKsdc90'
 STORE_URL = 'https://salla.sa/yourstore' 
 WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
 DB_FILE = 'database.db'
