@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, PreCheckou
 
 # --- الإعدادات ---
 TOKEN = '8870760665:AAGYJUTA0-MW34ivVBeNbYGUeBj1PKsdc90'
-
+WEB_APP_URL = 'https://scanphone.github.io/security-check/'
 DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
 
