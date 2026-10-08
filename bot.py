@@ -11,7 +11,7 @@ WEB_APP_URL = 'https://scanphone.github.io/security-check/'
 DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
 
-STARS_PRICE = 1  # عدد النجوم المطلوب للاشتراك
+STARS_PRICE = 150  # عدد النجوم المطلوب للاشتراك
 TUTORIAL_IMAGE_URL = 'https://i.top4top.io/p_39331u16a0.png'  # ضع هنا رابط الصورة التوضيحية لشرح الاستخدام
 
 def init_database():
