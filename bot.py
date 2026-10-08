@@ -11,7 +11,7 @@ WEB_APP_URL = 'https://fahhad1408-ctrl.github.io/security-check/'
 DB_FILE = 'database.db'
 EXCEL_FILE = 'codThqq.xlsx'
 
-STARS_PRICE = 100  # عدد النجوم المطلوب للاشتراك
+STARS_PRICE = 200  # عدد النجوم المطلوب للاشتراك
 TUTORIAL_IMAGE_URL = 'https://example.com/your-tutorial-image.jpg'  # ضع هنا رابط الصورة التوضيحية لشرح الاستخدام
 
 def init_database():
