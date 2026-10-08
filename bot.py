@@ -141,13 +141,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💡 هذه الرسوم رمزية لاستمرار تشغيل وصيانة البوت، ولا تكلفك سعر كوب قهوة أو وجبة عشاء!\n\n"
             "اضغط على زر الشراء أدناه لإتمام العملية فوراً:"
         )
-        markup = InlineKeyboardMarkup([[InlineKeyboardButton(f"شفع اشتراك بـ {STARS_PRICE} ⭐️", callback_data="buy_stars")]])
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(f"رسوم الفحص اضغط هنا  بـ {STARS_PRICE} ⭐️", callback_data="buy_stars")]])
         await query.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
         
     elif query.data == "buy_stars":
         chat_id = query.message.chat_id
-        title = "اشتراك فحص الأمان (30 يوماً)"
-        description = "صلاحية كاملة لفحص الجوال وكشف الروت وحالة الجهاز."
+        title = " تستطيع فحص جوالك عدد لانهائي مدة (30 يوماً)"
+        description = "ستظهر لك بعد الدفع نتيجة كاملة لفحص الجوال وكشف الروت وحالة الجهاز."
         payload = "security_scan_subscription"
         currency = "XTR" 
         prices = [LabeledPrice("اشتراك 30 يوم", STARS_PRICE)]
