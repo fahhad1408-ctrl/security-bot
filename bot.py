@@ -137,9 +137,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "want_to_scan":
         text = (
             "💳 **رسوم تفعيل الفحص**\n\n"
-            f"للاستمرار في استخدام البوت، تبلغ رسوم الاشتراك لمدة 30 يوماً **{STARS_PRICE} ⭐️ نجوم تيليجرام** فقط.\n"
+            f"للاستمرار في استخدام البوت، تبلغ رسوم الفحص ١٣ريال فقط لمدة 30 يوماً **{STARS_PRICE} ⭐️ نجوم تيليجرام** فقط.\n"
             "💡 هذه الرسوم رمزية لاستمرار تشغيل وصيانة البوت، ولا تكلفك سعر كوب قهوة أو وجبة عشاء!\n\n"
-            "اضغط على زر الشراء أدناه لإتمام العملية فوراً:"
+            "اضغط على زر رسوم الفحص أدناه لإتمام العملية فوراً:"
         )
         markup = InlineKeyboardMarkup([[InlineKeyboardButton(f"رسوم الفحص اضغط هنا  بـ {STARS_PRICE} ⭐️", callback_data="buy_stars")]])
         await query.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
